@@ -1,0 +1,21 @@
+[[source]]
+name = "pypi"
+url = "https://pypi.org/simple"
+verify_ssl = true
+
+[dev-packages]
+pylint = "*"
+black = "*"
+
+[packages]
+elasticsearch = "*"
+pandas = "*"
+tqdm = "*"
+boto3 = "*"
+confluent-kafka = "*"
+
+[requires]
+python_version = "3.6.5"
+
+[pipenv]
+allow_prereleases = true
