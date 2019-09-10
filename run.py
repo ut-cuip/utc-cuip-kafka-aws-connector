@@ -126,7 +126,7 @@ def main(num_workers, kafka_config):
                                 # Split out the dataframe for that day into each camera id
                                 for cam_id in cam_ids:
                                     df = whole_df.query(
-                                        "camera_id == {}".format(cam_id)
+                                        "camera_id == '{}'".format(cam_id)
                                     )
                                     csv_buffer = StringIO()
                                     df.to_csv(csv_buffer)
@@ -153,7 +153,7 @@ def main(num_workers, kafka_config):
                                 # Split out the dataframe for that day into each camera id
                                 for nicename in nicenames:
                                     df = whole_df.query(
-                                        "nicename == {}".format(nicename)
+                                        "nicename == '{}'".format(nicename)
                                     )
                                     csv_buffer = StringIO()
                                     df.to_csv(csv_buffer)
