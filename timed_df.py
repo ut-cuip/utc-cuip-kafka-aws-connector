@@ -46,6 +46,7 @@ class TimedDataFrameCollection:
             (list): List of tuples in form (date, dataframe) that have not been modified since @self.age_threshold 
         """
         collected_tuples = list()
+        months_to_delete = list()
 
         for month in self.frame_storage:
             if (
@@ -55,6 +56,10 @@ class TimedDataFrameCollection:
                 collected_tuples.append(
                     (month, (self.frame_storage[month]["dataframe"]))
                 )
-                del self.frame_storage[month]
+                months_to_delete.append(month)
+
+        # clean up **outside** of initial iteration to avoid crashes
+        for month in months_to_delete:
+            del self.frame_storage[month]
 
         return collected_tuples
