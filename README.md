@@ -24,7 +24,7 @@ So, for the sake of those who may use this tool in the future once I'm no longer
 
 1. Modify `config.yaml` to include the actual Kafka `bootstrap.servers`, `topics`, and `group-id` that you want to use.
 
-2. **Make sure** that `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` are in your current environment; on Unix-based CLI's you can enable this via `export AWS_ACCESS_KEY_ID = <client key>` and `export AWS_SECRET_ACCESS_KEY = <client secret>` . 
+2. **Make sure** that `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` are in your current environment; on Unix-based CLI's you can enable this via `export AWS_ACCESS_KEY_ID="<client key>"` and `export AWS_SECRET_ACCESS_KEY="<client secret>"` . 
 
    If you haven't done this and try to run the application, I've designed it to complain at you instead of letting `boto3` catch the issue and maybe crash with some obscure log to tell you what I just told you above.
 
