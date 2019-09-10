@@ -13,6 +13,7 @@ pandas = "*"
 tqdm = "*"
 boto3 = "*"
 confluent-kafka = "*"
+pyyaml = "*"
 
 [requires]
 python_version = "3.6.5"

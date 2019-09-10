@@ -1,0 +1,14 @@
+kafka:
+  - bootstrap-servers: "sckafka1.simcenter.utc.edu"
+    group-id: "aws-bucket-consumer-testing"
+    topics:
+      [
+        "cuip_vision_events",
+        "MLK_CENTRAL_AIR_QUALITY",
+        "MLK_DOUGLAS_AIR_QUALITY",
+        "MLK_GEORGIA_AIR_QUALITY",
+        "MLK_HOUSTON_AIR_QUALITY",
+        "MLK_LINDSAY_AIR_QUALITY",
+        "MLK_MAGNOLIA_AIR_QUALITY",
+        "MLK_PEEPLES_AIR_QUALITY",
+      ]
