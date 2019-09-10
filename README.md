@@ -30,7 +30,7 @@ So, for the sake of those who may use this tool in the future once I'm no longer
 
 3. Install the dependencies however you want - if you use PyEnv and Pipenv then it'll be easy (`pipenv install --dev` if you're going to develop, `pipenv install` otherwise)
 
-4. Run using Python3 / Pipenv (`<pipenv run >python run.py`). If you want to specify how many workers to use, use the `-n=#` or `--num-workers=#` flag - if it's not in this format it'll also complain with details as to why it doesn't work. This value defaults to the number of threads your system has (for example, my 9th-gen Core i7 has 12 threads [it's 6-core HyperThreaded]) so the default is 12. It also outputs whatever you end up using to assure you you've done it right.
+4. Run using Python3 / Pipenv (`<pipenv run >python run.py`). If you want to specify how many workers to use, use the `-n=#` or `--num-workers=#` flag - if it's not in this format it'll also complain with details as to why it doesn't work. This value defaults to the number of threads your system has (for example, my 9th-gen Core i7 has 12 threads [it's 6-core HyperThreaded] so the default is 12). It also outputs whatever you end up using to assure you you've done it right.
 
    Additionally you can use the `-h`, `--help` or `?` flag to get a help menu but it'll just tell you what I just did.
 
