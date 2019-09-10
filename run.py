@@ -135,7 +135,7 @@ def main(num_workers, kafka_config):
                                         Key="{}/{}/{}/{}-{}-{}.csv".format(
                                             cam_id, year, month, cam_id, year, month
                                         ),
-                                        Body=csv_buffer,
+                                        Body=csv_buffer.getvalue(),
                                     )
                                     print(
                                         Fore.GREEN
@@ -162,7 +162,7 @@ def main(num_workers, kafka_config):
                                         Key="{}/{}/{}/{}-{}-{}.csv".format(
                                             nicename, year, month, nicename, year, month
                                         ),
-                                        Body=csv_buffer,
+                                        Body=csv_buffer.getvalue(),
                                     )
                                     print(
                                         Fore.GREEN
