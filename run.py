@@ -3,6 +3,7 @@
     Center for Urban Informatics and Progress | CUIP
 """
 import datetime
+import glob
 import json
 import multiprocessing
 import os
@@ -19,13 +20,27 @@ from pip._vendor.colorama import Fore
 from timed_df import TimedDataFrameCollection
 
 
-def consume(kafka_config, payload_queue):
+def cache_json(json: str, name: str) -> None:
+    """
+    Dumps the JSON representation of an object to the disk
+    Args:
+        json (str): The JSON object to be dumped to ./cache {from JSON.dumps(object)}
+        name (str): The name to use when saving the JSON object to the disk
+    """
+    if not os.path.exists("./cache"):
+        os.mkdir("./cache")
+    with open("./cache/{}".format(name), "w") as file:
+        file.write(json)
+
+
+def consume(kafka_config: dict, payload_queue: multiprocessing.Queue) -> None:
     """
     A worker for consuming data from Kafka
     Args:
         kafka_config (dict): The kafka configuration segment from config.yaml
         payload_queue (multiprocessing.Queue): The queue that transfers Kafka payloads to the main thread
     """
+
     consumer = Consumer(
         {
             "bootstrap.servers": kafka_config["bootstrap-servers"],
@@ -33,7 +48,8 @@ def consume(kafka_config, payload_queue):
             "auto.offset.reset": "beginning",
         }
     )
-    consumer.subscribe(kafka_config["topics"])
+    topics_to_consume = kafka_config["topics"].copy()
+    consumer.subscribe(topics_to_consume)
 
     while True:
         msg = consumer.poll()
@@ -42,13 +58,34 @@ def consume(kafka_config, payload_queue):
 
         topic = msg.topic()
         msg = json.loads(msg.value())
+        msg_ts = datetime.datetime.fromtimestamp(msg["timestamp"] / 1000)
+        now = datetime.datetime.now()
 
-        # Convert the dict to string so that Pandas doesn't try to turn each item in the array into a new row
-        if topic == "cuip_vision_events":
-            msg["locations"] = str(msg["locations"])
+        # If this message is from **today**, stop consuming from that topic and cache the file
+        if (
+            msg_ts.year == now.year
+            and msg_ts.month == now.month
+            and msg_ts.day == now.day
+        ):
+            # Stop reading from this topic..
+            topics_to_consume.remove(topic)
+            consumer.unsubscribe()
+            # cache the json to the disk to make sure we've got it all set up.
+            cache_json(json.dumps(msg), "{}-{}.json".format(topic, str(msg_ts)))
+            # If there are even any topics to read from...
+            if topics_to_consume:
+                consumer.subscribe(topics_to_consume)
+            else:
+                print("Topic {} has been caught up to date.")
+                return
+        else:
+            # Convert the dict to string so that Pandas doesn't try to turn each item in the array into a new row
+            if topic == "cuip_vision_events":
+                msg["locations"] = str(msg["locations"])
 
-        # Send it off [as a tuple] into the queue
-        payload_queue.put((topic, msg))
+            # Send it off [as a tuple] into the queue
+            payload_queue.put((topic, msg))
+        del topic, msg, msg_ts, now
 
 
 def main(num_workers, kafka_config):
@@ -86,6 +123,33 @@ def main(num_workers, kafka_config):
     multiprocessing.set_start_method("spawn", force=True)
     payload_queue = multiprocessing.Queue(256)
 
+    print(
+        Fore.MAGENTA
+        + "Checking for locally cached files from the last run"
+        + Fore.RESET
+    )
+
+    loaded_from_cache = False
+    if os.path.exists("./cache"):
+        for filename in glob.glob("./cache/*.json"):
+            with open(filename, "r") as json_file:
+                topic_name = filename[: filename.index("-")]
+                payload_queue.put((topic_name, json.loads(json_file.read())))
+            os.remove(filename)
+            loaded_from_cache = True
+
+    if loaded_from_cache:
+        print(
+            Fore.BLUE + "Successfully loaded cached files and deleted them" + Fore.RESET
+        )
+    else:
+        print(
+            Fore.RED
+            + "Couldn't load any cached files - is this supposed to happen?"
+            + Fore.RESET
+        )
+    del loaded_from_cache
+
     # Instantiate the processes as daemons since they shouldn't exist without the main process
     workers = [
         multiprocessing.Process(
@@ -99,6 +163,14 @@ def main(num_workers, kafka_config):
 
     while True:
         try:
+            # Check to see if there are any workers alive:
+            any_alive = any([worker.is_alive() for worker in workers])
+            
+            if not any_alive:
+                print(Fore.BLUE + "Caught up!" + Fore.RESET)
+                map(lambda x : x.terminate(), workers)
+                break
+            
             topic, msg = payload_queue.get()
             msg_timestamp = datetime.datetime.fromtimestamp(msg["timestamp"] / 1000)
 
@@ -175,11 +247,10 @@ def main(num_workers, kafka_config):
                                 del year, month
                 last_prune_time = time.time()
 
-            del topic, msg, msg_timestamp
+            del topic, msg, msg_timestamp, any_alive
         except KeyboardInterrupt:
             print(Fore.RED + "Quitting.." + Fore.RESET)
-            for worker in workers:
-                worker.terminate()
+            map(lambda x : x.terminate(), workers)
             break
 
 
@@ -238,7 +309,7 @@ if __name__ == "__main__":
                 exit()
 
     print(
-        Fore.BLUE
+        Fore.MAGENTA
         + "This program is written to use boto3 with the expectation that AWS Auth is stored in the system's environment."
         + Fore.RESET
     )
