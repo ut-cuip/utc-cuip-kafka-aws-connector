@@ -70,15 +70,16 @@ def main(num_workers, kafka_config):
     s3client = boto3.client("s3")
 
     last_prune_time = time.time()
+    # Map the topics to TimedDataFrameCollections with a 10-min retention time
     collection_per_topic = {
-        "cuip_vision_events": TimedDataFrameCollection(60),
-        "MLK_CENTRAL_AIR_QUALITY": TimedDataFrameCollection(60),
-        "MLK_DOUGLAS_AIR_QUALITY": TimedDataFrameCollection(60),
-        "MLK_GEORGIA_AIR_QUALITY": TimedDataFrameCollection(60),
-        "MLK_HOUSTON_AIR_QUALITY": TimedDataFrameCollection(60),
-        "MLK_LINDSAY_AIR_QUALITY": TimedDataFrameCollection(60),
-        "MLK_MAGNOLIA_AIR_QUALITY": TimedDataFrameCollection(60),
-        "MLK_PEEPLES_AIR_QUALITY": TimedDataFrameCollection(60),
+        "cuip_vision_events": TimedDataFrameCollection(600),
+        "MLK_CENTRAL_AIR_QUALITY": TimedDataFrameCollection(600),
+        "MLK_DOUGLAS_AIR_QUALITY": TimedDataFrameCollection(600),
+        "MLK_GEORGIA_AIR_QUALITY": TimedDataFrameCollection(600),
+        "MLK_HOUSTON_AIR_QUALITY": TimedDataFrameCollection(600),
+        "MLK_LINDSAY_AIR_QUALITY": TimedDataFrameCollection(600),
+        "MLK_MAGNOLIA_AIR_QUALITY": TimedDataFrameCollection(600),
+        "MLK_PEEPLES_AIR_QUALITY": TimedDataFrameCollection(600),
     }
 
     # Multiprocessing work
@@ -111,8 +112,8 @@ def main(num_workers, kafka_config):
 
             collection_per_topic[topic].append(data_slice)
 
-            # Only prune data every three minutes
-            if time.time() - last_prune_time > 30:
+            # Only prune data every minute
+            if time.time() - last_prune_time >= 60:
                 for topic_key in collection_per_topic:
                     to_submit = collection_per_topic[topic_key].prune()
                     # If there's any data to upload to S3, do it.
