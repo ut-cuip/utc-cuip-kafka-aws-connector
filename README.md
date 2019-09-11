@@ -9,9 +9,7 @@ The tools in this repository are designed to assist with migration and offloadin
 This dependency list may grow to be out of date, so see `Pipfile` for an accurate display of dependencies. As of last modification, dependencies for this project include:
 
 * Python 3.6.5 with the following libraries:
-  * elasticsearch
   * pandas
-  * tqdm
   * boto3
   * confluent-kafka
   * pyyaml
