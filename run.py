@@ -132,7 +132,7 @@ def main(num_workers, kafka_config):
                                     df.to_csv(csv_buffer)
                                     s3client.put_object(
                                         Bucket="utc-cuip-video-events",
-                                        Key="{}/{}/{}/{}-{}-{}.csv".format(
+                                        Key="utc-cuip-video-events/{}/{}/{}/{}-{}-{}.csv".format(
                                             cam_id, year, month, cam_id, year, month
                                         ),
                                         Body=csv_buffer.getvalue(),
@@ -159,7 +159,7 @@ def main(num_workers, kafka_config):
                                     df.to_csv(csv_buffer)
                                     s3client.put_object(
                                         Bucket="utc-cuip-air-quality",
-                                        Key="{}/{}/{}/{}-{}-{}.csv".format(
+                                        Key="utc-cuip-air-quality/{}/{}/{}/{}-{}-{}.csv".format(
                                             nicename, year, month, nicename, year, month
                                         ),
                                         Body=csv_buffer.getvalue(),
