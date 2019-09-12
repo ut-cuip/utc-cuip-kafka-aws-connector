@@ -114,7 +114,7 @@ class DataframeManager:
                     df.to_csv(csv_buffer, index=False)
                     self.s3client.put_object(
                         Bucket="utc-cuip-video-events",
-                        Key="{}/{}/{}/{}-{}-{}.csv".format(
+                        Key="{}/year={}/month={}/{}-{}-{}.csv".format(
                             camera_id, year, month, camera_id, year, month
                         ),
                         Body=csv_buffer.getvalue(),
@@ -125,7 +125,7 @@ class DataframeManager:
             dataframe.to_csv(csv_buffer, index=False)
             self.s3client.put_object(
                 Bucket="utc-cuip-air-quality",
-                Key="{}/{}/{}/{}-{}-{}.csv".format(
+                Key="{}/year={}/month={}/{}-{}-{}.csv".format(
                     self.topic.lower(), year, month, self.topic.lower(), year, month
                 ),
                 Body=csv_buffer.getvalue(),
