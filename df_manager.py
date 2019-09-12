@@ -34,6 +34,10 @@ class DataframeManager:
         Args:
             msg (dict): The Kafka message to append into the categorized Dataframe
         """
+        # Older data my be missing the timestamp; account for this:
+        if not "timestamp" in msg:
+            return
+
         msg_timestamp = datetime.datetime.fromtimestamp(msg["timestamp"] / 1000)
         msg_date = "{}-{}".format(msg_timestamp.year, msg_timestamp.month)
 
@@ -65,7 +69,6 @@ class DataframeManager:
         del data_slice, msg_date, msg_timestamp
 
         if time.time() - self.last_flush_time >= self.flush_intval:
-            print("Flushing")
             self.flush()
 
     def flush(self) -> None:
@@ -117,7 +120,7 @@ class DataframeManager:
                         Body=csv_buffer.getvalue(),
                     )
                 del df
-        else: 
+        elif "AIR_QUALITY" in self.topic:
             csv_buffer = StringIO()
             dataframe.to_csv(csv_buffer, index=False)
             self.s3client.put_object(
