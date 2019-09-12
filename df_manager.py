@@ -65,6 +65,7 @@ class DataframeManager:
         del data_slice, msg_date, msg_timestamp
 
         if time.time() - self.last_flush_time >= self.flush_intval:
+            print("Flushing")
             self.flush()
 
     def flush(self) -> None:
@@ -84,6 +85,7 @@ class DataframeManager:
             os.remove(filename)
 
         for date in self.df_map:
+            print("Writing ./cache/{} {}.csv to disk".format(self.topic, date))
             self.df_map[date].to_csv(
                 "./cache/{} {}.csv".format(self.topic, date), index=False
             )

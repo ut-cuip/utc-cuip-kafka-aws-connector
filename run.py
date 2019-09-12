@@ -96,7 +96,6 @@ def main(num_workers: int, flush_intval: int, kafka_config: dict) -> None:
         try:
             topic, msg = payload_queue.get()
             dfmanager_per_topic[topic].append(msg)
-
             del topic, msg
         except KeyboardInterrupt:
             print(Fore.RED + "Quitting.." + Fore.RESET)
