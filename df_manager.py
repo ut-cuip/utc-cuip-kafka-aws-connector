@@ -1,3 +1,7 @@
+"""
+    Author: Jose Stovall
+    Center for Urban Informatics and Progress | CUIP
+"""
 import datetime
 import glob
 import os
@@ -44,7 +48,7 @@ class DataframeManager:
         if not msg_date in self.df_map:
             cache_name = "{} {}.csv".format(self.topic, msg_date)
             if not os.path.exists("./cache/{}".format(cache_name)):
-                self.df_map[msg_date] = pd.DataFrame()
+                self.df_map[msg_date] = pd.DataFrame(index=[0])
             # Otherwise just read it in
             else:
                 self.df_map[msg_date] = pd.read_csv(
