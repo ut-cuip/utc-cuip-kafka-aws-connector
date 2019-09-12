@@ -57,14 +57,13 @@ class DataframeManager:
                     "./cache/{}".format(cache_name), index_col=False
                 )
 
-        # Slap it in there!
         self.df_map[msg_date] = self.df_map[msg_date].append(
             data_slice, ignore_index=True, sort=False
         )
 
+        # Catch what GC probably won't...
         del data_slice, msg_date, msg_timestamp
 
-        # Flush every ... 10 minutes?
         if time.time() - self.last_flush_time >= self.flush_intval:
             self.flush()
 
@@ -100,6 +99,7 @@ class DataframeManager:
             year (int) : the year the of the dataframe's contents (YYYY)
             month (int) : the month the of the dataframe's contents (MM)
         """
+        # For vision events, we want to split the CSV by camera_id
         if self.topic == "cuip_vision_events":
             camera_ids = dataframe.camera_id.unique().tolist()
             for camera_id in camera_ids:
@@ -115,7 +115,7 @@ class DataframeManager:
                         Body=csv_buffer.getvalue(),
                     )
                 del df
-        else:
+        else: 
             csv_buffer = StringIO()
             dataframe.to_csv(csv_buffer, index=False)
             self.s3client.put_object(
