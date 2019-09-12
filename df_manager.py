@@ -13,16 +13,18 @@ import pandas as pd
 
 
 class DataframeManager:
-    def __init__(self, topic: str) -> None:
+    def __init__(self, topic: str, flush_intval: int) -> None:
         """
         Manages dataframes for a given topic
         Args:
             topic (str): The topic name that this manager is responsible for
+            flush_intval (int): How regularly (in seconds) to flush the data to AWS and disk
         """
         self.df_map = {}
         self.topic = topic
         self.s3client = boto3.client("s3")
         self.last_flush_time = time.time()
+        self.flush_intval = flush_intval
         if not os.path.exists("./cache"):
             os.mkdir("./cache")
 
@@ -63,7 +65,7 @@ class DataframeManager:
         del data_slice, msg_date, msg_timestamp
 
         # Flush every ... 10 minutes?
-        if time.time() - self.last_flush_time >= 10:
+        if time.time() - self.last_flush_time >= self.flush_intval:
             self.flush()
 
     def flush(self) -> None:

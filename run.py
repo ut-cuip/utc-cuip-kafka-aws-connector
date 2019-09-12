@@ -42,6 +42,9 @@ def consume(kafka_config: dict, payload_queue: multiprocessing.Queue) -> None:
         msg = json.loads(msg.value())
         # Convert the dict to string so that Pandas doesn't try to turn each item in the array into a new row
         if topic == "cuip_vision_events":
+            # Ensure that hit_counts (which wasn't implemented til later) is recorded one way or another
+            if not "hit_counts" in msg:
+                msg["hit_counts"] = len(msg["locations"])
             msg["locations"] = str(msg["locations"])
 
         # Send it off [as a tuple] into the queue
@@ -50,23 +53,29 @@ def consume(kafka_config: dict, payload_queue: multiprocessing.Queue) -> None:
         del topic, msg
 
 
-def main(num_workers: int, kafka_config: dict) -> None:
+def main(num_workers: int, flush_intval: int, kafka_config: dict) -> None:
     """
     The main process loop
     Args:
         num_workers (int): The number of workers to spin off
             DEFAULT: os.cpu_count(); the number of CPUs your system has (including threads)
+        flush_intval (int): The frequency (in seconds) which CSVs are flushed to disk and Kafka
+            DEFAULT: 86400 (24 hours)
         kafka_config (dict): The kafka configuration segment from config.yaml
     """
     print(
         Fore.MAGENTA
-        + "Running with {} worker{}".format(
+        + "Running with {} worker{}\n".format(
             num_workers, "" if num_workers == 1 else "s"
         )
+        + "Running with {}s flush interval".format(flush_intval)
         + Fore.RESET
     )
 
-    dfmanager_per_topic = {x: DataframeManager(x) for x in kafka_config["topics"]}
+    # Create a set of DataframeManagers for every topic
+    dfmanager_per_topic = {
+        x: DataframeManager(x, flush_intval) for x in kafka_config["topics"]
+    }
 
     # Multiprocessing work
     multiprocessing.set_start_method("spawn", force=True)
@@ -103,30 +112,49 @@ if __name__ == "__main__":
     Also colors, because pip._vendor.colorama.Fore is easy and fun to use
     """
 
-    def print_formatting_error() -> None:
+    def print_formatting_error(flag: str) -> None:
         """
         Internal function for __main__ to print formatting issues with the cmdline args
+        Args:
+            flag (str) the flag to print the error for
         """
-        print(
-            Fore.RED
-            + "--num-workers / -n argument is in wrong format. It should be:"
-            + Fore.RESET
-        )
-        print(Fore.CYAN + "   \u2022 -n=<#>" + Fore.RESET)
-        print(Fore.CYAN + "   \u2022 --num-workers=<#>" + Fore.RESET)
-        print(
-            Fore.CYAN
-            + "    where <#> represents the number of workers to spin off"
-            + Fore.RESET
-        )
+        if flag == "n":
+            print(
+                Fore.RED
+                + "--num-workers / -n argument is in wrong format. It should be:"
+                + Fore.RESET
+            )
+            print(Fore.CYAN + "   \u2022 -n=<#>" + Fore.RESET)
+            print(Fore.CYAN + "   \u2022 --num-workers=<#>" + Fore.RESET)
+            print(
+                Fore.CYAN
+                + "    where <#> represents the number of workers to spin off"
+                + Fore.RESET
+            )
+        elif flag == "f":
+            print(
+                Fore.RED
+                + "--flush-interval / -f argument is in wrong format. It should be:"
+                + Fore.RESET
+            )
+            print(Fore.CYAN + "   \u2022 -f=<#>" + Fore.RESET)
+            print(Fore.CYAN + "   \u2022 --flush-interval=<#>" + Fore.RESET)
+            print(
+                Fore.CYAN
+                + "    where <#> represents how frequently (in seconds) to flush data to the disk and S3"
+                + Fore.RESET
+            )
 
-    worker_count = os.cpu_count()
-    if worker_count == None:
-        worker_count = 1
+    # Default the worker count to your CPU count
+    # Since os.cpu_count() may return None if there's an error, check for that
+    worker_count = os.cpu_count() if os.cpu_count() != None else 1
+    # Default the flush_interval to one day
+    flush_interval = 86400
 
     args = {
         "--help, -h": "Prints this display",
         "--num-workers, -n": "The number of workers to process with; defaults to your machine's thread count if not described (or 1 if that's not detectable)",
+        "--flush-interval, -n": "The frequency (in seconds) with which to flush data to the disk and S3; i.e. -f=10 means every 10 seconds data will be flushed to the disk and submitted to S3",
     }
 
     # Manual arg-parsing for more detailed issue reporting
@@ -139,13 +167,25 @@ if __name__ == "__main__":
         elif "-n" in arg:
             parts = arg.split("=")
             if len(parts) != 2:
-                print_formatting_error()
+                print_formatting_error("n")
                 print(Fore.RED + "It seems you don't have a '='" + Fore.RESET)
                 exit()
             try:
                 worker_count = int(parts[1])
             except ValueError:
-                print_formatting_error()
+                print_formatting_error("n")
+                print(Fore.RED + "It seems you don't have a number after the '='")
+                exit()
+        elif "-f" in arg:
+            parts = arg.split("=")
+            if len(parts) != 2:
+                print_formatting_error("f")
+                print(Fore.RED + "It seems you don't have a '='" + Fore.RESET)
+                exit()
+            try:
+                flush_interval = int(parts[1])
+            except ValueError:
+                print_formatting_error("f")
                 print(Fore.RED + "It seems you don't have a number after the '='")
                 exit()
 
@@ -193,4 +233,5 @@ if __name__ == "__main__":
     else:
         print(Fore.RED + "No config.yaml found for Kafka Info" + Fore.RESET)
         exit()
-    main(worker_count, config["kafka"][0])
+
+    main(worker_count, flush_interval, config["kafka"][0])
