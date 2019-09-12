@@ -41,21 +41,25 @@ class DataframeManager:
         )
 
         # Make sure the overarching dataframe is there
-        if not self.df_map[msg_date]:
+        if not msg_date in self.df_map:
             cache_name = "{} {}.csv".format(self.topic, msg_date)
             if not os.path.exists("./cache/{}".format(cache_name)):
                 self.df_map[msg_date] = pd.DataFrame()
             # Otherwise just read it in
             else:
-                self.df_map[msg_date] = pd.read_csv("./cache/{}".format(cache_name))
+                self.df_map[msg_date] = pd.read_csv(
+                    "./cache/{}".format(cache_name), index_col=False
+                )
 
         # Slap it in there!
-        self.df_map[msg_date] = self.df_map[msg_date].append(data_slice)
+        self.df_map[msg_date] = self.df_map[msg_date].append(
+            data_slice, ignore_index=True, sort=False
+        )
 
-        del data_slice, msg_date, msg_timestamp, cache_name
+        del data_slice, msg_date, msg_timestamp
 
         # Flush every ... 10 minutes?
-        if time.time() - self.last_flush_time >= 600:
+        if time.time() - self.last_flush_time >= 10:
             self.flush()
 
     def flush(self) -> None:
@@ -63,14 +67,21 @@ class DataframeManager:
         Writes data out to disk, uploads old CSVs then deletes them
         """
         for filename in glob.glob("./cache/{}*.csv".format(self.topic)):
-            df = pd.read_csv(filename)
-            year, month = filename.replace("{} ".format(self.topic))
+            df = pd.read_csv(filename, index_col=False)
+            year, month = (
+                filename.replace("{} ".format(self.topic), "")
+                .replace(".csv", "")
+                .replace("./cache/", "")
+                .split("-")
+            )
             self.submit(df, year, month)
             del df, year, month
             os.remove(filename)
 
         for date in self.df_map:
-            self.df_map[date].to_csv("./cache/{} {}.csv".format(self.topic, date))
+            self.df_map[date].to_csv(
+                "./cache/{} {}.csv".format(self.topic, date), index=False
+            )
 
         self.df_map.clear()
         self.last_flush_time = time.time()
@@ -87,21 +98,23 @@ class DataframeManager:
             camera_ids = dataframe.camera_id.unique().tolist()
             for camera_id in camera_ids:
                 df = dataframe.query("camera_id == '{}'".format(camera_id))
-                csv_buffer = StringIO()
-                df.to_csv(csv_buffer)
-                self.s3client.put_object(
-                    Bucket="utc-cuip-video-events",
-                    Key="utc-cuip-video-events/{}/{}/{}/{}-{}-{}.csv".format(
-                        camera_id, year, month, camera_id, year, month
-                    ),
-                    Body=csv_buffer.getvalue(),
-                )
+                if df.size > 0:
+                    csv_buffer = StringIO()
+                    df.to_csv(csv_buffer, index=False)
+                    self.s3client.put_object(
+                        Bucket="utc-cuip-video-events",
+                        Key="{}/{}/{}/{}-{}-{}.csv".format(
+                            camera_id, year, month, camera_id, year, month
+                        ),
+                        Body=csv_buffer.getvalue(),
+                    )
+                del df
         else:
             csv_buffer = StringIO()
-            dataframe.to_csv(csv_buffer)
+            dataframe.to_csv(csv_buffer, index=False)
             self.s3client.put_object(
                 Bucket="utc-cuip-air-quality",
-                Key="utc-cuip-air-quality/{}/{}/{}/{}-{}-{}.csv".format(
+                Key="{}/{}/{}/{}-{}-{}.csv".format(
                     self.topic.lower(), year, month, self.topic.lower(), year, month
                 ),
                 Body=csv_buffer.getvalue(),
