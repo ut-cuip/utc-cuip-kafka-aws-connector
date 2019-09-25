@@ -81,7 +81,7 @@ def main(num_workers: int, flush_intval: int, kafka_config: dict) -> None:
 
     # Multiprocessing work
     multiprocessing.set_start_method("spawn", force=True)
-    payload_queue = multiprocessing.Queue(256)
+    payload_queue = multiprocessing.Queue(8)
 
     # Prioritize cuip_vision_events if it's there
     if "cuip_vision_events" in kafka_config["topics"]:
@@ -119,7 +119,8 @@ def main(num_workers: int, flush_intval: int, kafka_config: dict) -> None:
             dfmanager_per_topic[topic].append(msg)
             del topic, msg
         except KeyboardInterrupt:
-            dfmanager_per_topic[topic].flush()
+            for t in dfmanager_per_topic:
+                dfmanager_per_topic[t].flush()
             print(Fore.RED + "Quitting.." + Fore.RESET)
             map(lambda x: x.terminate(), workers)
             break
