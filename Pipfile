@@ -9,9 +9,9 @@ black = "*"
 
 [packages]
 pandas = "*"
-boto3 = "*"
 confluent-kafka = "*"
 pyyaml = "*"
+s3fs = "*"
 
 [requires]
 python_version = "3.6.5"

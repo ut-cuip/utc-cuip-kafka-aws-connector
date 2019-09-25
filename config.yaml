@@ -1,6 +1,6 @@
 kafka:
   - bootstrap-servers: "sckafka1.simcenter.utc.edu"
-    group-id: "kafka-aws-connector"
+    group-id: "kafka-aws-connector-optimized"
     topics:
       [
         "cuip_vision_events",

@@ -15,14 +15,16 @@ from pip._vendor.colorama import Fore
 from df_manager import DataframeManager
 
 
-def consume(kafka_config: dict, payload_queue: multiprocessing.Queue) -> None:
+def consume(
+    kafka_config: dict, topic: any, payload_queue: multiprocessing.Queue
+) -> None:
     """
     A worker for consuming data from Kafka
     Args:
         kafka_config (dict): The kafka configuration segment from config.yaml
+        topic (str / list): A single (or list of) string(s) of the topic(s) to connect to
         payload_queue (multiprocessing.Queue): The queue that transfers Kafka payloads to the main thread
     """
-
     consumer = Consumer(
         {
             "bootstrap.servers": kafka_config["bootstrap-servers"],
@@ -30,7 +32,7 @@ def consume(kafka_config: dict, payload_queue: multiprocessing.Queue) -> None:
             "auto.offset.reset": "beginning",
         }
     )
-    consumer.subscribe(kafka_config["topics"])
+    consumer.subscribe(topic if type(topic) == list else [topic])
 
     while True:
         msg = consumer.poll()
@@ -81,13 +83,32 @@ def main(num_workers: int, flush_intval: int, kafka_config: dict) -> None:
     multiprocessing.set_start_method("spawn", force=True)
     payload_queue = multiprocessing.Queue(256)
 
-    # Instantiate the processes as daemons since they shouldn't exist without the main process
-    workers = [
-        multiprocessing.Process(
-            target=consume, daemon=True, args=(kafka_config, payload_queue)
-        )
-        for i in range(num_workers)
-    ]
+    # Prioritize cuip_vision_events if it's there
+    if "cuip_vision_events" in kafka_config["topics"]:
+        workers = [
+            multiprocessing.Process(
+                target=consume,
+                daemon=True,
+                args=(kafka_config, "cuip_vision_events", payload_queue),
+            )
+            for i in range(num_workers // 2)
+        ]
+        kafka_config["topics"].remove("cuip_vision_events")
+        workers += [
+            multiprocessing.Process(
+                target=consume,
+                daemon=True,
+                args=(kafka_config, kafka_config["topics"], payload_queue),
+            )
+            for i in range(num_workers - (num_workers // 2))
+        ]
+    else:
+        workers = [
+            multiprocessing.Process(
+                target=consume, daemon=True, args=(kafka_config, payload_queue)
+            )
+            for i in range(num_workers)
+        ]
 
     for worker in workers:
         worker.start()
@@ -98,6 +119,7 @@ def main(num_workers: int, flush_intval: int, kafka_config: dict) -> None:
             dfmanager_per_topic[topic].append(msg)
             del topic, msg
         except KeyboardInterrupt:
+            dfmanager_per_topic[topic].flush()
             print(Fore.RED + "Quitting.." + Fore.RESET)
             map(lambda x: x.terminate(), workers)
             break
@@ -153,7 +175,7 @@ if __name__ == "__main__":
     args = {
         "--help, -h": "Prints this display",
         "--num-workers, -n": "The number of workers to process with; defaults to your machine's thread count if not described (or 1 if that's not detectable)",
-        "--flush-interval, -n": "The frequency (in seconds) with which to flush data to the disk and S3; i.e. -f=10 means every 10 seconds data will be flushed to the disk and submitted to S3",
+        "--flush-interval, -f": "The frequency (in seconds) with which to flush data to the disk and S3; i.e. -f=10 means every 10 seconds data will be flushed to the disk and submitted to S3",
     }
 
     # Manual arg-parsing for more detailed issue reporting
@@ -162,7 +184,7 @@ if __name__ == "__main__":
         if "?" in arg or "-h" in arg:
             for arg_help in args:
                 print(Fore.YELLOW + arg_help + Fore.RESET, args[arg_help])
-            break
+            exit()
         elif "-n" in arg:
             parts = arg.split("=")
             if len(parts) != 2:
@@ -190,7 +212,7 @@ if __name__ == "__main__":
 
     print(
         Fore.MAGENTA
-        + "This program is written to use boto3 with the expectation that AWS Auth is stored in the system's environment."
+        + "This program is written to use S3FS with the expectation that AWS Auth is stored in the system's environment."
         + Fore.RESET
     )
     if not "AWS_ACCESS_KEY_ID" in os.environ:
