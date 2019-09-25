@@ -93,6 +93,8 @@ class DataframeManager:
                     filename = "utc-cuip-air-quality/{}/year={}/month={}/{}-{}-{}.csv".format(
                         nicename, year, month, nicename, year, month
                     )
+                    if "nan" in filename:
+                        continue
                     if self.fs.exists(filename):
                         df = pd.read_csv("s3://{}".format(filename))
                     else:
