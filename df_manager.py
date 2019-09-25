@@ -10,9 +10,8 @@ import time
 from io import StringIO
 
 import pandas as pd
-from pip._vendor.colorama import Fore
-
 import s3fs
+from pip._vendor.colorama import Fore
 
 
 class DataframeManager:
@@ -28,7 +27,8 @@ class DataframeManager:
         self.flush_intval = flush_intval
         self.records = []
         self.fs = s3fs.S3FileSystem(anon=False)
-
+        if not os.path.exists("./cache"):
+            os.mkdir("./cache")
 
     def append(self, msg: dict) -> None:
         """
@@ -47,6 +47,8 @@ class DataframeManager:
         """
         Writes data out to disk, uploads old CSVs then deletes them
         """
+        print("Flushing...")
+        print("Topic {} accrued {} messages in {}s".format(self.topic, len(self.records), self.flush_intval))
         # This is a slice of the random-dated data - we need to split it up by month
         df_slice = pd.DataFrame.from_records(self.records)
         df_slice.insert(
@@ -61,13 +63,13 @@ class DataframeManager:
         for unique_month in unique_months:
             year, month = unique_month.split("-")
             year, month = int(year), int(month)
+            if year == 1970:
+                continue
             by_month = df_slice[
                 (df_slice["timestamp-iso"] > "{}-01".format(unique_month))
                 & (
                     df_slice["timestamp-iso"]
-                    < "{}-{}".format(
-                        unique_month, calendar.monthrange(year, month)[1]
-                    )
+                    < "{}-{}".format(unique_month, calendar.monthrange(year, month)[1])
                 )
             ]
             if self.topic == "cuip_vision_events":
@@ -75,33 +77,39 @@ class DataframeManager:
                 # Write to AWS
                 for cam_id in camera_ids:
                     submit_df = by_month.query("camera_id == '{}'".format(cam_id))
-                    filename = "utc-cuip-video-events/{}/year={}/month={}/{}-{}-{}.csv".format(
+                    local_filename = "./cache/{}-{}-{}.csv".format(cam_id, year, month)
+                    s3_filename = "utc-cuip-video-events/{}/year={}/month={}/{}-{}-{}.csv".format(
                         cam_id, year, month, cam_id, year, month
                     )
                     # Check to see if the df already exists:
-                    if self.fs.exists(filename):
-                        df = pd.read_csv("s3://{}".format(filename))
+                    if os.path.exists(local_filename):
+                        df = pd.read_csv(local_filename)
                     else:
                         df = pd.DataFrame()
                     df = df.append(submit_df, ignore_index=True, sort=False)
-                    df.to_csv("s3://{}".format(filename))
-                    del df, submit_df, filename
+                    df.to_csv("s3://{}".format(s3_filename))
+                    df.to_csv(local_filename)
+                    del df, submit_df
             elif "AIR_QUALITY" in self.topic:
                 nicenames = df_slice["nicename"].unique().tolist()
                 for nicename in nicenames:
                     submit_df = by_month.query("nicename == '{}'".format(nicename))
-                    filename = "utc-cuip-air-quality/{}/year={}/month={}/{}-{}-{}.csv".format(
+                    local_filename = "./cache/{}-{}-{}.csv".format(
+                        nicename, year, month
+                    )
+                    s3_filename = "utc-cuip-air-quality/{}/year={}/month={}/{}-{}-{}.csv".format(
                         nicename, year, month, nicename, year, month
                     )
-                    if "nan" in filename:
+                    if "nan" in s3_filename:
                         continue
-                    if self.fs.exists(filename):
-                        df = pd.read_csv("s3://{}".format(filename))
+                    if os.path.exists(local_filename):
+                        df = pd.read_csv(local_filename)
                     else:
                         df = pd.DataFrame()
                     df = df.append(submit_df, ignore_index=True, sort=False)
-                    df.to_csv("s3://{}".format(filename))
-                    del df, submit_df, filename
+                    df.to_csv("s3://{}".format(s3_filename))
+                    df.to_csv(local_filename)
+                    del df, submit_df
 
             else:
                 print(
@@ -111,7 +119,7 @@ class DataframeManager:
                     + Fore.RESET
                 )
 
-
         del self.records[:]
         self.records = []
         self.last_flush_time = time.time()
+        print("Done flushing for topic {}".format(self.topic))
