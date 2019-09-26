@@ -30,6 +30,8 @@ def consume(
             "bootstrap.servers": kafka_config["bootstrap-servers"],
             "group.id": kafka_config["group-id"],
             "auto.offset.reset": "beginning",
+            # Give the max poll intv'l plenty of time so that CSV uploading can finish
+            "max.poll.interval.ms": 3600000
         }
     )
     consumer.subscribe(topic if type(topic) == list else [topic])
@@ -76,7 +78,7 @@ def main(num_workers: int, flush_intval: int, kafka_config: dict) -> None:
 
     # Create a set of DataframeManagers for every topic
     dfmanager_per_topic = {
-        x: DataframeManager(x, flush_intval) for x in kafka_config["topics"]
+        x: DataframeManager(x) for x in kafka_config["topics"]
     }
 
     # Multiprocessing work
@@ -112,15 +114,21 @@ def main(num_workers: int, flush_intval: int, kafka_config: dict) -> None:
 
     for worker in workers:
         worker.start()
-
+    
+    last_flush_time = time.time()
     while True:
         try:
             topic, msg = payload_queue.get()
             dfmanager_per_topic[topic].append(msg)
             del topic, msg
+            # Doing this here ensures that other DF managers are thinking it's time to flush
+            if time.time() - last_flush_time >= flush_interval:
+                for topic in dfmanager_per_topic:
+                    dfmanager_per_topic[topic].flush()
+                last_flush_time = time.time()
         except KeyboardInterrupt:
-            for t in dfmanager_per_topic:
-                dfmanager_per_topic[t].flush()
+            for topic in dfmanager_per_topic:
+                dfmanager_per_topic[topic].flush()
             print(Fore.RED + "Quitting.." + Fore.RESET)
             map(lambda x: x.terminate(), workers)
             break

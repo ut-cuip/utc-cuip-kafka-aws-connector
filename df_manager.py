@@ -15,7 +15,7 @@ from pip._vendor.colorama import Fore
 
 
 class DataframeManager:
-    def __init__(self, topic: str, flush_intval: int) -> None:
+    def __init__(self, topic: str) -> None:
         """
         Manages dataframes for a given topic
         Args:
@@ -23,8 +23,6 @@ class DataframeManager:
             flush_intval (int): How regularly (in seconds) to flush the data to AWS and disk
         """
         self.topic = topic
-        self.last_flush_time = time.time()
-        self.flush_intval = flush_intval
         self.records = []
         self.fs = s3fs.S3FileSystem(anon=False)
         if not os.path.exists("./cache"):
@@ -38,17 +36,16 @@ class DataframeManager:
         if not "timestamp" in msg:
             return
         self.records.append(msg)
-        print("{} processed {} records".format(self.topic, len(self.records)))
-
-        if time.time() - self.last_flush_time >= self.flush_intval:
-            self.flush()
 
     def flush(self) -> None:
         """
         Writes data out to disk, uploads old CSVs then deletes them
         """
         print("Flushing...")
-        print("Topic {} accrued {} messages in {}s".format(self.topic, len(self.records), self.flush_intval))
+        print("Topic {} accrued {} messages".format(self.topic, len(self.records)))
+        if len(self.records) <= 0:
+            return
+            
         # This is a slice of the random-dated data - we need to split it up by month
         df_slice = pd.DataFrame.from_records(self.records)
         df_slice.insert(
@@ -121,5 +118,4 @@ class DataframeManager:
 
         del self.records[:]
         self.records = []
-        self.last_flush_time = time.time()
         print("Done flushing for topic {}".format(self.topic))
