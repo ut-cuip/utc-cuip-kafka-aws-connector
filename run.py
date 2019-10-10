@@ -126,6 +126,7 @@ def main(num_workers: int, flush_intval: int, kafka_config: dict) -> None:
                 for topic in dfmanager_per_topic:
                     dfmanager_per_topic[topic].flush()
                 last_flush_time = time.time()
+            print("Done flushing")
         except KeyboardInterrupt:
             for topic in dfmanager_per_topic:
                 dfmanager_per_topic[topic].flush()

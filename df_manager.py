@@ -41,11 +41,15 @@ class DataframeManager:
         """
         Writes data out to disk, uploads old CSVs then deletes them
         """
-        print("Flushing...")
-        print("Topic {} accrued {} messages".format(self.topic, len(self.records)))
+        print(
+            "Topic {} accumulated {} messages".format(
+                Fore.GREEN + self.topic + Fore.RESET,
+                Fore.CYAN + str(len(self.records)) + Fore.RESET,
+            )
+        )
         if len(self.records) <= 0:
             return
-            
+
         # This is a slice of the random-dated data - we need to split it up by month
         df_slice = pd.DataFrame.from_records(self.records)
         df_slice.insert(
