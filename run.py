@@ -14,7 +14,6 @@ from pip._vendor.colorama import Fore
 
 from df_manager import DataframeManager
 
-
 def consume(
     kafka_config: dict, topic: any, payload_queue: multiprocessing.Queue
 ) -> None:
@@ -63,8 +62,8 @@ def main(num_workers: int, flush_intval: int, kafka_config: dict) -> None:
     Args:
         num_workers (int): The number of workers to spin off
             DEFAULT: os.cpu_count(); the number of CPUs your system has (including threads)
-        flush_intval (int): The frequency (in seconds) which CSVs are flushed to disk and Kafka
-            DEFAULT: 86400 (24 hours)
+        flush_intval (int): The number of messages to build up before uploading to S3
+            DEFAULT: 1000
         kafka_config (dict): The kafka configuration segment from config.yaml
     """
     print(
@@ -72,7 +71,7 @@ def main(num_workers: int, flush_intval: int, kafka_config: dict) -> None:
         + "Running with {} worker{}\n".format(
             num_workers, "" if num_workers == 1 else "s"
         )
-        + "Running with {}s flush interval".format(flush_intval)
+        + "Running with {} item flush interval".format(flush_intval)
         + Fore.RESET
     )
 
@@ -114,19 +113,16 @@ def main(num_workers: int, flush_intval: int, kafka_config: dict) -> None:
 
     for worker in workers:
         worker.start()
-    
-    last_flush_time = time.time()
+
     while True:
         try:
             topic, msg = payload_queue.get()
             dfmanager_per_topic[topic].append(msg)
             del topic, msg
-            # Doing this here ensures that other DF managers are thinking it's time to flush
-            if time.time() - last_flush_time >= flush_interval:
-                for topic in dfmanager_per_topic:
+            # Flush DFManagers with at least 1K messages
+            for topic in dfmanager_per_topic:
+                if len(dfmanager_per_topic[topic].records) >= flush_intval:
                     dfmanager_per_topic[topic].flush()
-                last_flush_time = time.time()
-            print("Done flushing")
         except KeyboardInterrupt:
             for topic in dfmanager_per_topic:
                 dfmanager_per_topic[topic].flush()
@@ -180,12 +176,12 @@ if __name__ == "__main__":
     # Since os.cpu_count() may return None if there's an error, check for that
     worker_count = os.cpu_count() if os.cpu_count() != None else 1
     # Default the flush_interval to one day
-    flush_interval = 86400
+    flush_interval = 1000
 
     args = {
         "--help, -h": "Prints this display",
         "--num-workers, -n": "The number of workers to process with; defaults to your machine's thread count if not described (or 1 if that's not detectable)",
-        "--flush-interval, -f": "The frequency (in seconds) with which to flush data to the disk and S3; i.e. -f=10 means every 10 seconds data will be flushed to the disk and submitted to S3",
+        "--flush-count, -f": "How many items a csv must accrue until it is uploaded to S3",
     }
 
     # Manual arg-parsing for more detailed issue reporting
